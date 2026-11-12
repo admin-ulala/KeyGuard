@@ -6,7 +6,7 @@
 
 简体中文 | [English](README.en.md)
 
-**按条件接管 Windows 快捷键的闸门** —— 不装驱动、不联网、不注入其他进程。
+**按条件接管 Windows 快捷键的闸门**
 
 [![version](https://img.shields.io/badge/version-0.1.12-7C5CFF)](#安装)
 [![platform](https://img.shields.io/badge/platform-Windows%2010%2F11-4E8DFF)](#已知限制)
@@ -14,7 +14,8 @@
 
 </div>
 
-游戏过程中误触 <kbd>Win</kbd> 弹出开始菜单、共享屏幕时误按 <kbd>Alt</kbd>+<kbd>Tab</kbd> 切出桌面、远程协助时快捷键被转发到对端——KeyGuard 只做一件事：**在指定条件下拦截指定组合键；条件结束即恢复原状。**
+游戏过程中误触 <kbd>Win</kbd> 弹出开始菜单、共享屏幕时误按 <kbd>Alt</kbd>+<kbd>Tab</kbd> 切出桌面、远程协助时快捷键被转发到对端
+KeyGuard：**在指定条件下拦截指定组合键；条件结束即恢复原状。不装驱动、不联网、不注入其他进程。**
 
 ---
 

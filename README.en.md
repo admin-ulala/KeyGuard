@@ -4,17 +4,18 @@
 
 # KeyGuard
 
-**A condition-driven gate for Windows shortcuts** — no driver, no network access, no injection into other processes.
+English | [简体中文](README.md)
+
+**A condition-driven gate for Windows shortcuts**
 
 [![version](https://img.shields.io/badge/version-0.1.12-7C5CFF)](#installation)
 [![platform](https://img.shields.io/badge/platform-Windows%2010%2F11-4E8DFF)](#known-limitations)
 [![license](https://img.shields.io/badge/license-MIT-2FD3A4)](LICENSE)
 
-English | [简体中文](README.md)
-
 </div>
 
-Pressing <kbd>Win</kbd> mid-game opens the Start menu and pushes the game to the background; a stray <kbd>Alt</kbd>+<kbd>Tab</kbd> during screen sharing exposes the desktop; in a remote session your shortcuts get forwarded to the other side. KeyGuard does one thing: **it blocks the specified key combinations under the conditions you define, and restores them as soon as those conditions end.**
+Pressing <kbd>Win</kbd> mid-game opens the Start menu and pushes the game to the background; a stray <kbd>Alt</kbd>+<kbd>Tab</kbd> during screen sharing exposes the desktop; in a remote session your shortcuts get forwarded to the other side
+KeyGuard: **it blocks the specified key combinations under the conditions you define, and restores them as soon as those conditions end. No driver, no network access, no injection into other processes.**
 
 ---
 
