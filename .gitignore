@@ -1,0 +1,6 @@
+/target
+/.tmp
+/dist
+*.log
+
+/installer/*.exe

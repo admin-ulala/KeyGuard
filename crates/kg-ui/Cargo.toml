@@ -1,0 +1,18 @@
+[package]
+name = "kg-ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "KeyGuard 界面（Medium 权限，只通过命名管道读写 Agent）"
+
+[[bin]]
+name = "kg-ui"
+path = "src/main.rs"
+
+[dependencies]
+kg-core = { path = "../kg-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+wry = "0.57"
+tao = "0.37"
+windows-sys = { workspace = true }

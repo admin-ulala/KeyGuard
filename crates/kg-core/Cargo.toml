@@ -1,0 +1,15 @@
+[package]
+name = "kg-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "钩子、按键掩码、状态机（纯逻辑，可单测）"
+
+[lib]
+name = "kg_core"
+path = "src/lib.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+windows-sys.workspace = true

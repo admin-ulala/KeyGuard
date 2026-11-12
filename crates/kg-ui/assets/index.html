@@ -1,0 +1,1312 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>KeyGuard</title>
+<style>
+:root{
+  --bg:#0B0C0E; --panel:#111317; --panel2:#171A1F; --panel3:#1E222A;
+  --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.13);
+  --tx:#EDEFF3; --tx2:#A6ADB9; --tx3:#8A92A0; --tx4:#5F6674;
+  --accent:#8B5CF6; --accent-soft:rgba(139,92,246,.16); --accent-tx:#C9B6FF;
+  --ok:#35D39A; --ok-soft:rgba(53,211,154,.13);
+  --warn:#FFAE3C; --warn-soft:rgba(255,174,60,.12);
+  --bad:#FF6B6B; --bad-soft:rgba(255,107,107,.12);
+  --mono:ui-monospace,'Cascadia Mono',Consolas,'JetBrains Mono',monospace;
+  --font:'Inter',-apple-system,system-ui,'Segoe UI','Microsoft YaHei',sans-serif;
+  --r:10px;
+  color-scheme:dark;
+}
+html[data-theme="light"]{
+  --bg:#F4F5F7; --panel:#FFFFFF; --panel2:#F7F8FA; --panel3:#EEF0F4;
+  --line:rgba(15,20,30,.09); --line2:rgba(15,20,30,.16);
+  --tx:#16181D; --tx2:#4A515C; --tx3:#6B7280; --tx4:#9AA1AC;
+  --accent:#6D43E0; --accent-soft:rgba(109,67,224,.10); --accent-tx:#5A34C9;
+  --ok:#0E9E6E; --ok-soft:rgba(14,158,110,.10);
+  --warn:#B26A00; --warn-soft:rgba(178,106,0,.10);
+  --bad:#D33B3B; --bad-soft:rgba(211,59,59,.10);
+  color-scheme:light;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+/* WebView2 在切主题时偶尔不给左侧栏重画（继承来的变量变了，合成层却没失效），
+   显式写死浅色值最稳，顺带保证浅色下边框也够淡。 */
+html[data-theme="light"] .rail{background:#FFFFFF;border-right-color:rgba(15,20,30,.09)}
+html[data-theme="light"] .top{background:#FFFFFF;border-bottom-color:rgba(15,20,30,.09)}
+body{background:var(--bg);color:var(--tx);font:13px/1.5 var(--font);-webkit-font-smoothing:antialiased;overflow:hidden;user-select:none}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,select{font:inherit;color:inherit}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:8px;border:3px solid transparent;background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background:var(--tx4);background-clip:padding-box}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+
+.modal{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);backdrop-filter:blur(2px)}
+.modal[hidden]{display:none}
+.mbox.wide{width:520px}
+.mbox .in{width:100%;height:34px;margin-top:12px;padding:0 10px;border-radius:8px;border:1px solid var(--line2);background:var(--panel3);color:var(--tx);font:13px var(--font);outline:none}
+.mbox .in:focus{border-color:var(--accent)}
+.mbox .ta{width:100%;height:170px;margin-top:12px;padding:10px;border-radius:8px;border:1px solid var(--line2);background:var(--panel3);color:var(--tx);font:11.5px/1.6 var(--mono);resize:vertical;outline:none}
+.mbox .ta:focus{border-color:var(--accent)}
+.mbox{width:380px;background:var(--panel);border:1px solid var(--line2);border-radius:14px;padding:18px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+.mh{font-size:14px;font-weight:600;margin-bottom:14px}
+.capture{display:flex;align-items:center;justify-content:center;height:74px;border-radius:10px;border:1px dashed var(--line2);
+  background:var(--panel2);font:600 17px/1 var(--mono);letter-spacing:.5px;color:var(--tx)}
+.capture.live{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-tx)}
+.mhint{font-size:11.5px;color:var(--tx4);line-height:1.6;margin-top:10px}
+.mfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.mhint.warn{color:var(--warn)}
+.quitrem{display:flex;align-items:flex-start;gap:7px;margin-top:14px;font-size:11.5px;color:var(--tx4);line-height:1.5;cursor:pointer;user-select:none}
+.quitrem input{width:13px;height:13px;margin:1px 0 0;accent-color:var(--accent);cursor:pointer;flex:none}
+.quitrem:hover{color:var(--tx2)}
+
+/* ── 外壳 ─────────────────────────────── */
+.app{display:flex;height:100vh}
+.rail{width:56px;flex:0 0 56px;background:var(--panel);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:2px}
+.logo{width:30px;height:30px;border-radius:9px;overflow:hidden;display:grid;place-items:center;margin-bottom:12px;box-shadow:0 2px 10px rgba(124,92,255,.35)}
+.logo svg{width:30px;height:30px;display:block}
+.nav{width:40px;height:38px;border-radius:9px;display:grid;place-items:center;color:var(--tx3);position:relative}
+.nav svg{width:17px;height:17px}
+.nav:hover{color:var(--tx);background:var(--panel2)}
+.nav.on{color:var(--accent-tx);background:var(--accent-soft)}
+.nav.on::before{content:"";position:absolute;left:-8px;top:9px;width:2px;height:20px;border-radius:2px;background:var(--accent)}
+.spacer{flex:1}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+
+/* ── 状态条（兼标题栏） ─────────────────── */
+.top{height:46px;flex:0 0 46px;display:flex;align-items:center;gap:12px;padding:0 8px 0 18px;
+  border-bottom:1px solid var(--line);background:var(--panel);cursor:default}
+.st{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--tx2);white-space:nowrap}
+.st .d{width:7px;height:7px;border-radius:50%;background:var(--tx4)}
+.st.lock{color:var(--tx)} .st.lock .d{background:var(--ok);box-shadow:0 0 0 3px var(--ok-soft)}
+.st.ok{color:var(--tx)} .st.ok .d{background:var(--ok);box-shadow:0 0 0 3px var(--ok-soft)}
+.st.warn .d{background:var(--warn);box-shadow:0 0 0 3px var(--warn-soft)}
+.st.idle .d{background:var(--tx4)}
+.st.bad{color:var(--bad)} .st.bad .d{background:var(--bad);box-shadow:0 0 0 3px rgba(255,107,107,.18)}
+.st .sub{font-weight:400;color:var(--tx3);font-size:12px}
+.st .sub b{font-weight:600;color:var(--tx2)}
+.power{display:flex;align-items:center;gap:14px;padding:14px 16px;margin-bottom:14px;flex-wrap:wrap}
+.power .pwl{display:flex;align-items:center;gap:12px;flex:1;min-width:220px}
+.power .plt .n{font-size:14px;font-weight:600}
+.power .plt .d{font-size:12px;color:var(--tx3);margin-top:2px}
+.bigsw{width:46px;height:26px;flex:0 0 46px;border-radius:13px;border:1px solid var(--line2);background:var(--panel3);
+  position:relative;cursor:pointer;transition:background-color .16s,border-color .16s}
+.bigsw::after{content:'';position:absolute;left:3px;top:2px;width:20px;height:20px;border-radius:50%;
+  background:var(--tx3);transition:transform .16s,background-color .16s}
+.bigsw.on{background:rgba(47,211,164,.18);border-color:var(--ok)}
+.bigsw.on::after{transform:translateX(20px);background:var(--ok)}
+.power.off .plt .n{color:var(--tx2)}
+.chk{font-size:12px;color:var(--tx3);padding:4px 9px;border-radius:6px;background:var(--panel2);white-space:nowrap}
+.chk.ok{color:var(--ok);background:var(--ok-soft)}
+.chk.bad{color:var(--bad);background:rgba(255,107,107,.12)}
+.top .fill{flex:1}
+.counter{font-size:12px;color:var(--tx3);white-space:nowrap;cursor:pointer;padding:4px 6px;border-radius:6px}
+.counter:hover{background:var(--panel2);color:var(--tx2)}
+.wbtns{display:flex;gap:2px}
+.wb{width:34px;height:30px;border-radius:7px;display:grid;place-items:center;color:var(--tx3)}
+.wb:hover{background:var(--panel2);color:var(--tx)}
+.wb.x:hover{background:var(--bad);color:#fff}
+
+/* ── 通用控件 ─────────────────────────── */
+.view{flex:1;min-height:0;overflow:auto}
+.page{padding:20px 22px 28px;max-width:1000px}
+.bar{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.btn{height:30px;padding:0 12px;border-radius:8px;border:1px solid var(--line2);color:var(--tx2);
+  font-size:12.5px;display:inline-flex;align-items:center;gap:6px;background:var(--panel)}
+.btn:hover{color:var(--tx);border-color:var(--line2);background:var(--panel2)}
+.btn.pri{background:var(--accent);border-color:transparent;color:#fff;font-weight:600}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--tx3)}
+.btn.ghost:hover{background:var(--panel2);color:var(--tx)}
+.btn.sm{height:26px;padding:0 9px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:default}
+.sel{height:30px;border-radius:8px;border:1px solid var(--line2);background:var(--panel);color:var(--tx);
+  padding:0 26px 0 10px;font-size:12.5px;appearance:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10' fill='none' stroke='%238A92A0' stroke-width='1.4'><path d='M2.5 4l2.5 2.5L7.5 4'/></svg>");
+  background-repeat:no-repeat;background-position:right 9px center}
+.sel:hover{border-color:var(--tx4)}
+.search{display:flex;align-items:center;gap:7px;height:30px;padding:0 10px;border-radius:8px;
+  background:var(--panel2);border:1px solid transparent;width:200px}
+.search:focus-within{border-color:var(--accent);background:var(--panel)}
+.search svg{width:13px;height:13px;color:var(--tx4);flex:0 0 auto}
+.search input{flex:1;min-width:0;background:none;border:none;outline:none;font-size:12.5px}
+.search input::placeholder{color:var(--tx4)}
+.grow{flex:1}
+.muted{color:var(--tx3);font-size:12px}
+.mono{font-family:var(--mono);font-size:11.5px}
+
+/* ── 快捷键表 ─────────────────────────── */
+.grp{margin-bottom:6px}
+.gh{display:flex;align-items:center;gap:8px;height:34px;padding:0 8px;border-radius:8px;color:var(--tx3);width:100%}
+.gh:hover{background:var(--panel2);color:var(--tx2)}
+.gh svg{width:12px;height:12px;transition:transform .12s}
+.gh.closed svg{transform:rotate(-90deg)}
+.gh .t{font-size:12px;font-weight:600;letter-spacing:.2px}
+.gh .c{margin-left:auto;font-size:11.5px;color:var(--tx4);font-variant-numeric:tabular-nums}
+.rows{display:flex;flex-direction:column}
+.row{display:flex;align-items:center;gap:14px;min-height:48px;padding:6px 10px;border-radius:9px}
+.hero{margin-bottom:14px;padding:14px 16px;border-radius:12px;border:1px solid var(--line);background:linear-gradient(180deg,rgba(139,92,246,.10),rgba(139,92,246,.02))}
+.hero .ht{font-size:13px;font-weight:600}
+.hero .hd{font-size:11.5px;color:var(--tx3);margin-top:3px}
+.hero .hrow{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.hero .hskip{margin-top:10px;font-size:11.5px;color:var(--tx3);background:none;border:none;cursor:pointer;padding:0}
+.hero .hskip:hover{color:var(--accent-tx);text-decoration:underline}
+.hero .hbtn{flex:1 1 180px;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--line2);background:var(--panel);cursor:pointer;transition:.15s}
+.hero .hbtn:hover{border-color:var(--accent);background:var(--panel2)}
+.hero .hbtn b{display:block;font-size:12.5px;font-weight:600;color:var(--tx)}
+.hero .hbtn span{display:block;font-size:11px;color:var(--tx3);margin-top:3px;line-height:1.5}
+.addrow{display:flex;align-items:center;gap:8px;width:100%;height:44px;margin-top:6px;padding:0 10px;border-radius:9px;
+  color:var(--tx3);font-size:12.5px;border:1px dashed var(--line2)}
+.addrow:hover{color:var(--accent-tx);border-color:var(--accent);background:var(--accent-soft)}
+.row[hidden]{display:none}
+.row:hover{background:var(--panel2)}
+.row.hl{background:var(--accent-soft)}
+.keys{display:flex;align-items:center;gap:3px;flex:0 0 168px;min-width:0}
+.kbd{min-width:22px;height:22px;padding:0 6px;border-radius:5px;border:1px solid var(--line2);
+  background:var(--panel3);display:inline-flex;align-items:center;justify-content:center;
+  font:11.5px/1 var(--mono);color:var(--tx2);white-space:nowrap}
+.plus{color:var(--tx4);font-size:10px;margin:0 1px}
+.nm{flex:1;min-width:0;font-size:13px;color:var(--tx)}
+.nm .n1{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tw{flex:0 0 56px;display:flex;justify-content:flex-end}
+.tag{font-size:11.5px;color:var(--tx4);white-space:nowrap;padding:2px 7px;border-radius:5px}
+.tag.link{color:var(--tx3);cursor:pointer}
+.tag.link:hover{color:var(--accent-tx);background:var(--accent-soft)}
+.row.dim .nm{color:var(--tx3)}
+.row.dim .kbd{opacity:.55}
+
+/* 开关 */
+.sw{width:34px;height:20px;border-radius:11px;background:var(--panel3);border:1px solid var(--line2);
+  position:relative;flex:0 0 auto;transition:background .14s,border-color .14s}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+  background:var(--tx3);transition:transform .14s,background .14s}
+.sw.on{background:var(--accent);border-color:transparent}
+.sw.on::after{transform:translateX(14px);background:#fff}
+.sw:hover::after{background:var(--tx2)}
+.sw.on:hover::after{background:#fff}
+.sw[disabled]{opacity:.4;cursor:default}
+
+/* ── 自动切换 ─────────────────────────── */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.card .ch{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.card .ch .t{font-size:12.5px;font-weight:600}
+.card .cb{padding:6px}
+.rule{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:8px;flex-wrap:wrap}
+.rule:hover{background:var(--panel2)}
+.rule .w{font-size:12.5px;color:var(--tx3);white-space:nowrap}
+.rule select{height:28px;border-radius:7px;border:1px solid var(--line);background:var(--panel3);
+  color:var(--tx);padding:0 22px 0 8px;font-size:12.5px;appearance:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10' fill='none' stroke='%238A92A0' stroke-width='1.4'><path d='M2.5 4l2.5 2.5L7.5 4'/></svg>");
+  background-repeat:no-repeat;background-position:right 7px center}
+.rule select:hover{border-color:var(--line2)}
+.rule input.exe{height:28px;border-radius:7px;border:1px solid transparent;background:var(--panel3);
+  padding:0 9px;font-size:12.5px;width:190px;outline:none}
+.rule input.exe:focus{border-color:var(--accent);background:var(--panel)}
+.rule input.exe::placeholder{color:var(--tx4)}
+.rule .rm{margin-left:auto;opacity:.45}
+.rule:hover .rm{opacity:1}
+.empty{padding:26px 14px;text-align:center;color:var(--tx4);font-size:12.5px}
+
+/* ── 设置 ─────────────────────────────── */
+.sec{margin-bottom:18px}
+.sec>.h{font-size:11.5px;font-weight:600;color:var(--tx4);letter-spacing:.6px;text-transform:uppercase;padding:0 2px 8px}
+.sec .card .line{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.sec .card .line:last-child{border-bottom:none}
+.line .l{flex:1;min-width:0}
+.line .l .n{display:block;font-size:13px}
+.line .l .d{display:block;font-size:11.5px;color:var(--tx4);margin-top:2px}
+.seg{display:inline-flex;background:var(--panel2);border-radius:8px;padding:2px;gap:2px}
+.seg button{height:24px;padding:0 10px;border-radius:6px;font-size:12px;color:var(--tx3)}
+.seg button.on{background:var(--panel3);color:var(--tx);box-shadow:0 1px 2px rgba(0,0,0,.18)}
+details.adv{border-top:1px solid var(--line)}
+details.adv>summary{list-style:none;padding:12px 14px;font-size:12.5px;color:var(--tx3);cursor:pointer;display:flex;gap:8px;align-items:center}
+details.adv>summary::-webkit-details-marker{display:none}
+details.adv>summary::before{content:"";width:0;height:0;border-left:4px solid var(--tx4);border-top:3.5px solid transparent;border-bottom:3.5px solid transparent;transition:transform .12s}
+details.adv[open]>summary::before{transform:rotate(90deg)}
+details.adv>summary:hover{color:var(--tx2)}
+.kv{display:grid;grid-template-columns:120px 1fr;gap:6px 14px;padding:0 14px 14px;font-size:12px}
+.kv .k{color:var(--tx4)}
+.kv .v{color:var(--tx2);font-family:var(--mono);font-size:11.5px;user-select:text;word-break:break-all}
+
+/* ── 浮层 ─────────────────────────────── */
+#toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,8px);opacity:0;visibility:hidden;
+  display:flex;align-items:center;gap:12px;padding:9px 12px 9px 14px;border-radius:9px;
+  background:var(--panel3);border:1px solid var(--line2);box-shadow:0 10px 30px rgba(0,0,0,.35);
+  font-size:12.5px;color:var(--tx);z-index:60;transition:.16s}
+#toast.on{opacity:1;visibility:visible;transform:translate(-50%,0)}
+#toast button{color:var(--accent-tx);font-weight:600;font-size:12.5px;padding:2px 6px;border-radius:5px}
+#toast button:hover{background:var(--accent-soft)}
+.menu{position:fixed;z-index:70;min-width:168px;background:var(--panel3);border:1px solid var(--line2);
+  border-radius:9px;padding:5px;box-shadow:0 14px 34px rgba(0,0,0,.4);display:none}
+.menu.on{display:block}
+.menu button{display:flex;width:100%;align-items:center;gap:8px;height:30px;padding:0 9px;border-radius:6px;font-size:12.5px;color:var(--tx2)}
+.menu button:hover{background:var(--accent-soft);color:var(--tx)}
+.menu .sep{height:1px;background:var(--line);margin:5px 4px}
+.menu .lb{font-size:11px;color:var(--tx4);padding:6px 9px 3px}
+.banner{display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:10px 12px;border-radius:9px;
+  background:var(--warn-soft);border:1px solid rgba(255,174,60,.28);color:var(--warn);font-size:12.5px}
+html[data-theme="light"] .banner{color:#8A5200}
+.banner .grow{flex:1}
+.kbdrow{display:flex;gap:4px}
+.hint{font-size:11.5px;color:var(--tx4)}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail">
+    <div class="logo"><svg viewBox="0 0 512 512"><defs><linearGradient id="kgLogo" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8B5CF6"/><stop offset="1" stop-color="#4E8DFF"/></linearGradient></defs><rect width="512" height="512" rx="112" fill="url(#kgLogo)"/><g stroke="#fff" stroke-width="78" stroke-linecap="round" fill="none"><path d="M180 132v248"/><path d="M180 256L334 130"/><path d="M180 256L334 382"/></g></svg></div>
+    <button class="nav" data-page="keys" title="键盘">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2.5" y="6.5" width="19" height="11" rx="2.5"/><path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M8 14h8"/></svg>
+    </button>
+    <button class="nav" data-page="auto" title="自动切换">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 8h11l-3-3M20 16H9l3 3"/></svg>
+    </button>
+    <div class="spacer"></div>
+    <button class="nav" data-page="settings" title="设置">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.2M12 18.8V21M4.2 7.5l1.9 1.1M17.9 15.4l1.9 1.1M4.2 16.5l1.9-1.1M17.9 8.6l1.9-1.1"/></svg>
+    </button>
+  </aside>
+
+  <div class="main">
+    <header class="top" id="top">
+      <div class="st" id="st"><span class="d"></span><span id="stt">连接中</span></div>
+      <div class="fill"></div>
+      <div class="counter" id="cnt" title="本次会话拦截的按键次数">已拦截 0 次</div>
+      <button class="btn sm ghost" id="quick" hidden></button>
+      <div class="wbtns">
+        <button class="wb" data-win="minimize" title="最小化"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 5h8" stroke="currentColor" stroke-width="1.2"/></svg></button>
+        <button class="wb x" data-win="close" title="关闭"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.2"/></svg></button>
+      </div>
+    </header>
+    <div class="view" id="view"></div>
+  </div>
+</div>
+<div id="toast"></div>
+<div class="modal" id="rec" hidden>
+  <div class="mbox">
+    <div class="mh">录制组合键</div>
+    <div class="capture" id="cap"><span class="muted">按下组合键</span></div>
+    <div class="mhint" id="caphint">单键将拦截该键全部输入</div>
+    <div class="mfoot">
+      <button class="btn ghost sm" data-act="rec-cancel">取消</button>
+      <button class="btn sm pri" data-act="rec-save" disabled>保存</button>
+    </div>
+  </div>
+</div>
+<div class="modal" id="ask" hidden>
+  <div class="mbox">
+    <div class="mh" id="askTitle">重命名</div>
+    <input class="in" id="askInput" autocomplete="off" spellcheck="false">
+    <div class="mhint" id="askHint"></div>
+    <div class="mfoot">
+      <button class="btn ghost sm" data-act="ask-cancel">取消</button>
+      <button class="btn sm pri" data-act="ask-ok">确定</button>
+    </div>
+  </div>
+</div>
+<div class="modal" id="imp" hidden>
+  <div class="mbox wide">
+    <div class="mh">导入配置</div>
+    <div class="mhint">覆盖当前配置</div>
+    <textarea class="ta" id="impText" spellcheck="false" placeholder='{"version":8,"rules":[],"profiles":[],"hotkeys":[]}'></textarea>
+    <div class="mfoot">
+      <button class="btn ghost sm" data-act="imp-cancel">取消</button>
+      <button class="btn sm pri" data-act="imp-ok">导入</button>
+    </div>
+  </div>
+</div>
+<div class="modal" id="quit" hidden>
+  <div class="mbox">
+    <div class="mh">关闭 KeyGuard 界面？</div>
+    <div class="mhint warn" id="quitWarn" hidden>后台未响应 · 收进托盘后无法唤回，请选择「退出界面」</div>
+    <label class="quitrem"><input type="checkbox" id="quitRemember"><span>不再询问</span></label>
+    <div class="mfoot">
+      <button class="btn ghost sm" data-act="quit-cancel">取消</button>
+      <button class="btn ghost sm" data-act="quit-exit">退出界面</button>
+      <button class="btn sm pri" id="quitTray" data-act="quit-tray">收进托盘</button>
+    </div>
+  </div>
+</div>
+<div class="menu" id="menu"></div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════
+   KeyGuard 界面
+   数据：window.__KG.onStatus(status) 每 800ms（结构变化才重绘）
+        window.__KG.onReply(response) 动作回执
+   动作：window.ipc.postMessage(JSON)
+   ══════════════════════════════════════════════════════════════════════ */
+
+const $ = s => document.querySelector(s);
+/* WebView2 用 data: 文档加载，源是 opaque，localStorage 会抛 SecurityError，
+   所以所有存取都包一层——以前这里直接 throw 导致整个脚本死掉、界面白屏。 */
+const mem = {};
+const LS = {
+  get(k){ try{ return localStorage.getItem(k); }catch(e){ return mem[k] == null ? null : mem[k]; } },
+  set(k,v){ mem[k] = String(v); try{ localStorage.setItem(k,v); }catch(e){} },
+};
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const PAGES = ['keys','auto','settings'];
+// 宿主用 KEYGUARD_PAGE 指定首屏（截图/演示用），优先级高于上次记住的页
+const START_PAGE = (typeof window.__KG_PAGE === 'string' && PAGES.includes(window.__KG_PAGE)) ? window.__KG_PAGE : '';
+
+const S = {
+  page: START_PAGE || 'keys',
+  online: null, err: '', st: null,
+  cat: null, rules: null,
+  edit: '',            // 正在编辑的方案（'' = 默认）
+  live: '',            // 当前实际生效的方案（可能由条件自动套上）
+  base: null,          // 默认开关里存着的那一套（和此刻生效的那套分开）
+  q: '', fold: {},
+  theme: LS.get('kg.theme') || 'auto',
+  quitDef: 'ask',      // 点 ✕ 的默认动作：ask / tray / exit，存在 ui.json 的 quitDefault
+  caps: [], auto: false, inited: false,
+};
+window.__KG_PAGE = undefined;
+
+/* ---------- 桥 ---------- */
+function send(o){ try{ window.ipc.postMessage(JSON.stringify(o)); }catch(e){ toast('界面通道异常'); } }
+function win(action){ try{ window.ipc.postMessage(action); }catch(e){} }
+function req(o, cb){ if (cb) S.waiter = cb; send(o); }
+
+window.__KG = {
+  /* 宿主收到 Alt+F4 / 任务栏「关闭窗口」时走这里：系统那边已经打算关了，
+     界面再问一句，用户才有机会改成「收进托盘」。 */
+  onQuitRequest(){ openQuit(); win('quit-ack'); },
+  onStatus(p){
+    const ok = !!(p && p.ok);
+    if (ok){ S.st = p.status || S.st; S.err = ''; }
+    else { S.err = (p && p.error) || '后台未运行'; if (p && p.cached) S.st = p.cached; }
+    const was = S.online;
+    S.online = ok;
+    // 后台能力位：决定「常驻 / 录制组合键 / 进程列表」这些新 UI 要不要出现
+    const caps = (S.st && Array.isArray(S.st.caps)) ? S.st.caps : [];
+    const capsChanged = caps.join() !== S.caps.join();
+    if (capsChanged) S.caps = caps;
+    // 记一下最近一次真的拦到按键的时刻 —— 这是"确实生效"最硬的证据
+    const bl = ((S.st || {}).blocked | 0);
+    if (bl > (S.prevBlocked | 0)) S.lastHit = Date.now();
+    S.prevBlocked = bl;
+    if (ok && !S.cat) send({op:'get_catalog'});
+    if (ok && !S.rules) send({op:'get_rules'});
+    paint();                             // 状态条：永远只写文本
+    const sig = structureSig();
+    if (sig !== S.sig || was !== ok || capsChanged){ S.sig = sig; render(); }
+  },
+  onReply(r){
+    if (!r) return;
+    if (!r.ok){ if (r.error) toast(r.error); return; }
+    const d = r.data || {};
+    if (d.entries){
+      S.cat = d;
+      S.live = d.profile || '';
+      if (!S.inited){ S.inited = true; S.edit = (S.st && S.st.manual) || ''; }
+      render();
+    }
+    else if (d.rules || d.version !== undefined){ S.rules = d; S.base = (d.hotkeys || []).slice(); render(); }
+    else if (d.json !== undefined){ S.ioText = d.json; exportFile(d); }
+    else if (d.profile !== undefined){ S.edit = d.profile || ''; send({op:'get_catalog'}); }
+    else if (d.enabled !== undefined){ S.auto = !!d.enabled; render(); }
+    else if (d.always !== undefined){ if (S.rules) S.rules.always = !!d.always; render(); }
+    else if (d.quitDefault !== undefined || d.theme !== undefined || d.page !== undefined){
+      if (d.quitDefault === 'ask' || d.quitDefault === 'tray' || d.quitDefault === 'exit') S.quitDef = d.quitDefault;
+      if (d.theme) S.theme = d.theme;
+      if (d.page && PAGES.includes(d.page) && !START_PAGE) S.page = d.page;
+      document.documentElement.dataset.theme = resolveTheme(); render();
+    }
+    else if (d.procs){ S.procs = d.procs; if (S.page === 'auto') render(); }
+    else if (d.custom !== undefined || d.id){ send({op:'get_catalog'}); }
+    if (S.waiter){ const f = S.waiter; S.waiter = null; try{ f(d); }catch(e){} }
+  }
+};
+
+/* 结构签名：只放"会改变 DOM 结构"的字段。
+   计数、p50/p99、前台进程名刻意排除 —— 它们每敲一键就变，
+   放进来等于「一有输入就整页重绘」，输入框会一直丢焦点。 */
+function structureSig(){
+  const st = S.st || {};
+  return [S.page, S.online, st.mode, st.armed, st.blocking, st.always, st.manual, st.backend,
+          st.scancode_map, st.hotkeys_rev, st.agent_pid, S.edit, S.cat ? S.cat.entries.length : 0,
+          S.rules ? (S.rules.rules || []).length : -1, S.cat ? (S.cat.scenes || []).length : -1].join('|');
+}
+
+/* ---------- 派生 ---------- */
+const catList = () => (S.cat && S.cat.entries) || [];
+const scenes  = () => (S.cat && S.cat.scenes) || [];
+const ruleset = () => S.rules || {version:7, rules:[], profiles:[], hotkeys:[], backend:'hook', blocking:false, always:false};
+const sceneOf = n => scenes().find(x => x.name === n || x.id === n);
+const baseOn  = () => S.base || (S.rules && S.rules.hotkeys) || [];
+const effOn   = () => { const sc = S.edit ? sceneOf(S.edit) : null; return (sc ? sc.on : baseOn()) || []; };
+const isOn    = id => effOn().includes(id);
+const has     = c => S.caps.includes(c);
+
+const HOW = {hook:'可拦截', win:'随 Win', access:'系统设置', never:'不可拦截'};
+const CATS = ['系统与开始菜单','窗口与任务切换','截屏与录制','输入法','辅助功能','不可拦截'];
+// catalog 里 cat 是英文枚举，界面上一律显示中文；未知分类原样兜底
+const CATNAME = {system:'系统与开始菜单', window:'窗口与任务切换', game:'游戏', input:'截屏与输入', access:'辅助功能', danger:'不可拦截', custom:'自定义按键'};
+const catName = c => CATNAME[c] || c;
+
+/* ---------- 状态条 ---------- */
+function paint(){
+  const st = S.st || {};
+  const el = $('#st'), t = $('#stt');
+  const mode = st.mode | 0;
+  const e = effState(st);
+  el.className = 'st ' + e.lv;
+  if (S.online === null){
+    t.innerHTML = '连接中';
+  } else {
+    t.innerHTML = `${esc(e.t)}<span class="sub"> · ${esc(e.d)}</span>`;
+    el.title = e.tip;
+  }
+  $('#cnt').textContent = '已拦截 ' + ((st.blocked | 0) || 0) + ' 次';
+  $('#cnt').title = st.blocked ? '每次拦截计一次；数值不变表示当前未拦截' : '尚未发生拦截';
+  const q = $('#quick');
+  q.hidden = true;   // 动作按钮都在电源卡里，右上角只留状态和窗口按钮
+  document.documentElement.dataset.theme = resolveTheme();
+  paintChecks(st);
+}
+
+/* 设置页的自检行：只写文本，不重绘 */
+function paintChecks(st){
+  const put = (id, txt, ok) => {
+    const n = document.getElementById(id);
+    if (!n) return;
+    n.textContent = txt;
+    n.className = 'chk' + (ok === true ? ' ok' : ok === false ? ' bad' : '');
+  };
+  put('sc-conn', S.online === false ? '未运行' : S.online ? '正常' : '连接中…', S.online);
+  put('sc-elev', st.elevated ? '管理员' : '普通用户', st.elevated);
+  put('sc-hook', st.armed ? '已装载' : '未装载', !!st.armed);
+  put('sc-be', st.backend === 'scancode' ? '扫描码映射' : st.backend === 'off' ? '仅检测' : '键盘钩子', st.backend === 'off' ? false : true);
+  put('sc-n', (effOn().length || 0) + ' 个', null);
+  const dt = S.lastHit ? Math.round((Date.now() - S.lastHit) / 1000) : -1;
+  put('sc-last', dt < 0 ? '无记录' : dt < 3 ? '刚刚' : dt < 60 ? dt + ' 秒前' : Math.round(dt / 60) + ' 分钟前', dt >= 0 ? true : null);
+}
+
+/* 拦截到底有没有生效：把"能拦 / 不能拦"摊开写在状态条上 */
+function effState(st){
+  const n = (S.cat && Array.isArray(S.cat.on)) ? S.cat.on.length : effOn().length;
+  const mode = st.mode | 0;
+  const liveN = (S.cat && Array.isArray(S.cat.on)) ? S.cat.on.length : effOn().length;
+  const be = st.backend || 'hook';
+  if (S.online === false)
+    return { lv:'bad', t:'未在拦截', d:'后台进程未运行', tip:'后台进程未启动，按键不会被拦截。请点击「启动后台」。' };
+  if (st.blocking === false)
+    return { lv:'idle', t:'未在拦截', d:'总开关已关闭', tip:'「始终拦截」与条件均未要求拦截，按键正常放行。' };
+  if (mode === 2)
+    return { lv:'warn', t:'拦截不完整', d:'前台程序权限高于后台', tip:'前台程序以更高权限运行，键盘钩子无法接收其按键。使用全机安装版（计划任务以管理员运行）可避免。' };
+  if (mode === 1){
+    if (st.armed === false)
+      return { lv:'warn', t:'拦截未生效', d:'键盘钩子未装载', tip:'状态机要求拦截，但键盘钩子未装载。请检查后台权限，或在「高级」中切换执行方式。' };
+    return { lv:'ok', t:'正在拦截', d:`${liveN} 个组合键 · ${be === 'hook' ? '键盘钩子' : be === 'scancode' ? '扫描码映射' : be}`, tip:`当前拦截 ${n} 个组合键；「已拦截」数值持续增长即为生效。` };
+  }
+  if (mode === 3)
+    return { lv:'temp', t:'已临时解除', d:'按键全部放行', tip:'按 Ctrl+Alt+Shift+F12 或托盘「恢复拦截」可恢复拦截状态。' };
+  return { lv:'idle', t:'未在拦截', d: n ? `已启用 ${n} 项 · 条件未命中` : '未启用任何按键', tip:'状态机待命中：当前前台不满足任何条件，按键正常放行。' };
+}
+function resolveTheme(){
+  if (S.theme !== 'auto') return S.theme;
+  return matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
+/* ---------- 渲染 ---------- */
+function render(){
+  try { renderInner(); } catch (err) {
+    console.error(err);
+    const v = document.getElementById('view');
+    if (v) v.innerHTML = '<div class="errbox"><b>界面渲染出错</b><div class="d">' + (err && err.message ? err.message : String(err)) + '</div></div>';
+  }
+}
+function renderInner(){
+  document.querySelectorAll('.nav').forEach(b => b.classList.toggle('on', b.dataset.page === S.page));
+  const v = $('#view');
+  const scroll = v.scrollTop;
+  v.innerHTML = S.page === 'keys' ? keysView() : S.page === 'auto' ? autoView() : settingsView();
+  v.scrollTop = scroll;
+  paint();
+}
+
+/* ══ 键盘 ══════════════════════════════════════════════ */
+function keysView(){
+  const POWER = powerCard();
+  const list = catList();
+  if (!list.length) return `<div class="page">
+    ${POWER}<div class="empty">${S.online ? '加载中…' : '后台未运行'}</div></div>`;
+
+  const groups = {};
+  list.forEach(e => { (groups[e.cat] = groups[e.cat] || []).push(e); });
+  const on = effOn();
+  const total = list.filter(e => e.how === 'hook' || e.how === 'access').length;
+  const opened = list.filter(e => (e.how === 'hook' || e.how === 'access') && on.includes(e.id)).length;
+
+  const schemes = [`<option value="">默认方案</option>`].concat(scenes().map(s => `<option value="${esc(s.name)}"${S.edit === s.name ? ' selected' : ''}>${esc(s.name)}</option>`)).join('');
+
+  const body = Object.keys(groups).map(cat => {
+    const items = groups[cat];
+    const adj = items.filter(e => e.how === 'hook' || e.how === 'access');
+    const onN = adj.filter(e => on.includes(e.id)).length;
+    const closed = S.fold[cat];
+    return `<section class="grp" data-g="${esc(cat)}">
+      <button class="gh${closed ? ' closed' : ''}" data-fold="${esc(cat)}">
+        <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 4L5 6.5 7.5 4"/></svg>
+        <span class="t">${esc(catName(cat))}</span>
+        <span class="c">${adj.length ? onN + ' / ' + adj.length : '—'}</span>
+      </button>
+      <div class="rows"${closed ? ' hidden' : ''}>${items.map(r => keyRow(r, on)).join('')}</div>
+    </section>`;
+  }).join('');
+
+  return `<div class="page">
+    ${POWER}
+    <div class="bar">
+      <select class="sel" id="scheme" title="当前编辑的方案">${schemes}</select>
+      ${S.live && S.live !== S.edit ? `<span class="tag" title="当前生效的方案（可能由自动切换条件套用）">生效：${esc(S.live)}</span>` : ''}
+      <button class="btn ghost sm" data-act="scheme-menu" title="方案操作">⋯</button>
+      <span class="muted">已启用 ${opened} / ${total}</span>
+      <div class="grow"></div>
+      <label class="search"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
+        <input id="q" placeholder="搜索快捷键" value="${esc(S.q)}" autocomplete="off"></label>
+      <button class="btn ghost sm" data-act="all" data-on="1">全部启用</button>
+      <button class="btn ghost sm" data-act="all" data-on="0">全部停用</button>
+    </div>
+    ${guideBanner()}
+    ${body}
+    ${has('custom_keys') ? `<button class="addrow" data-act="record"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 3v10M3 8h10"/></svg>录制组合键</button>` : ''}
+  </div>`;
+}
+
+function guideBanner(){
+  if (LS.get('kg.guide.off') === '1') return '';
+  if (S.edit || effOn().length || (S.rules && (S.rules.rules || []).length)) return '';
+  return `<div class="hero">
+    <div class="ht">选择预设</div>
+    <div class="hrow">${Object.keys(PRESETS).map(k => `<button class="hbtn" data-preset="${k}"><b>${PRESETS[k].t}</b><span>${PRESETS[k].d}</span></button>`).join('')}</div>
+    <button class="hskip" data-act="guide-off">跳过</button>
+  </div>`;
+}
+
+const PRESETS = {
+  game: { t:'游戏', d:'拦截开始菜单、任务切换与关闭窗口', ids:['win','alt-tab','alt-f4','alt-esc','alt-space','ctrl-esc','sticky-keys','filter-keys','toggle-keys','high-contrast'] },
+  demo: { t:'演示 / 录屏', d:'仅拦截意外切走窗口', ids:['win','alt-tab','alt-esc','alt-f4'] },
+  win:  { t:'仅 Win 键', d:'仅拦截 Windows 键', ids:['win'] }
+};
+function applyPreset(k){
+  const p = PRESETS[k]; if (!p) return;
+  const have = new Set(catList().map(e => e.id));
+  applyIds(p.ids.filter(id => have.has(id)));
+  LS.set('kg.guide', '1');
+}
+function keyRow(e, on){
+  const controllable = e.how === 'hook' || e.how === 'access';
+  const isOn2 = on.includes(e.id);
+  let tail = '';
+  if (!controllable){
+    // 随 Win 的键不需要单独开关：它们的去留由 Win 键本身决定，给一个跳转即可
+    tail = e.how === 'win'
+      ? `<button class="tag link" data-jump="${esc(winId())}" title="由 Windows 键决定">随 Win 键</button>`
+      : `<span class="tag">${HOW[e.how] || ''}</span>`;
+  } else {
+    tail = `<button class="sw${isOn2 ? ' on' : ''}" data-toggle="${esc(e.id)}" role="switch" aria-checked="${isOn2}" title="${isOn2 ? '已启用，点击停用' : '已停用，点击启用'}"></button>`;
+    if (e.custom) tail += `<button class="xdel" data-act="key-del" data-id="${esc(e.id)}" title="删除该按键">✕</button>`;
+  }
+  // 解释性文字只放悬停：一行一条 note 铺在列表下，整页就成了说明书
+  return `<div class="row${controllable ? '' : ' dim'}" data-row="${esc(e.id)}"${e.note ? ` title="${esc(e.note)}"` : ''}>
+    <div class="keys">${kb(e.combo)}</div>
+    <div class="nm"><div class="n1">${esc(e.name)}${e.custom ? '<span class="tag">自定义</span>' : ''}</div></div>
+    <div class="tw">${tail}</div>
+  </div>`;
+}
+function winId(){ const w = catList().find(e => e.id === 'win'); return w ? w.id : 'win'; }
+
+function kb(combo){
+  const parts = String(combo || '').split('+').map(s => s.trim()).filter(Boolean);
+  return parts.map(p => `<span class="kbd">${esc(p)}</span>`).join('<span class="plus">+</span>');
+}
+
+/* ══ 自动切换 ═══════════════════════════════════════════ */
+function offlineCard(){
+  return `<div class="card power off">
+    <div class="pwl">
+      <div class="plt">
+        <div class="n">后台未运行</div>
+        <div class="d">按键不会被拦截</div>
+      </div>
+    </div>
+    <button class="btn pri" data-act="start">启动后台</button>
+  </div>`;
+}
+
+
+/* 电源卡：总开关 + 拦截范围，是「开不开拦」唯一显眼的入口 */
+function powerCard(){
+  if (S.online === false) return offlineCard();
+  const rs = ruleset();
+  const on = rs.blocking !== false;
+  const always = !!rs.always;
+  const n = effOn().length;
+  const mode = (S.st && (S.st.mode | 0)) || 0;
+  const d = !on
+    ? '按键全部放行'
+    : always
+      ? '拦截所有程序 · ' + n + ' 个组合键 · 条件不生效'
+      : '条件命中时拦截 · ' + n + ' 个组合键';
+  const fg = (S.st && S.st.fg) || {};
+  const idleHint = (on && !always && mode === 0 && fg.exe)
+    ? `<div class="d" style="margin-top:4px">前台 <b>${esc(fg.exe)}</b> · 未匹配任何条件
+       <button class="btn sm ghost" data-act="quick-rule" style="margin-left:8px">添加条件</button></div>`
+    : '';
+  const action = mode === 1
+    ? `<button class="btn sm" data-act="unlock" title="本次放行，条件不再命中时自动恢复">临时解除</button>`
+    : mode === 3
+      ? `<button class="btn sm" data-act="lock" title="立即恢复拦截">恢复拦截</button>`
+      : (S.st && S.st.manual)
+        ? `<button class="btn sm ghost" data-act="auto" title="取消手动选择的方案，恢复按条件自动切换">恢复自动</button>`
+        : '';
+  return `<div class="card power${on ? '' : ' off'}">
+    <div class="pwl">
+      <button class="bigsw${on ? ' on' : ''}" data-act="power" role="switch" aria-checked="${on}" title="${on ? '点击关闭拦截' : '点击开启拦截'}"></button>
+      <div class="plt">
+        <div class="n">拦截${on ? '已开启' : '已关闭'}</div>
+        <div class="d">${esc(d)}</div>
+        ${idleHint}
+      </div>
+    </div>
+    ${action}
+    <div class="seg" data-seg="mode">
+      <button data-sv="always" class="${always ? 'on' : ''}">一直拦截</button>
+      <button data-sv="rule" class="${always ? '' : 'on'}">仅满足条件时</button>
+    </div>
+  </div>`;
+}
+
+function autoView(){
+  const rs = ruleset();
+  const rules = rs.rules || [];
+  const opts = [`<option value="">默认方案</option>`].concat(scenes().map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`)).join('');
+  const rows = rules.length ? rules.map((r, i) => {
+    const isAlways = !!r.always;
+    const isFs = !isAlways && !!r.fullscreen && !(r.exe || []).length;
+    const isProg = !isAlways && !!(r.exe || []).length;
+    const kind = isAlways ? 'always' : isFs ? 'fs' : 'prog';
+    return `<div class="rule" data-ri="${i}">
+      <select data-rc="kind">
+        ${has('always_rule') ? `<option value="always"${kind === 'always' ? ' selected' : ''}>常驻</option>` : ''}
+        <option value="fs"${kind === 'fs' ? ' selected' : ''}>当窗口全屏时</option>
+        <option value="prog"${kind === 'prog' ? ' selected' : ''}>当前台程序为</option>
+      </select>
+      ${kind === 'prog' ? `<input class="exe" data-rc="exe" list="procs" value="${esc((r.exe || []).join(', '))}" placeholder="程序名 · 支持部分匹配" spellcheck="false">
+      ${(S.st && S.st.fg && S.st.fg.exe) ? `<button class="btn sm ghost" data-act="cur-exe" data-ri="${i}" title="填入当前前台程序名">当前前台</button>` : ''}
+      <select data-rc="when" title="该程序窗口化运行时是否生效">
+        <option value="any"${r.fullscreen ? '' : ' selected'}>窗口化时也生效</option>
+        <option value="fs"${r.fullscreen ? ' selected' : ''}>仅全屏时生效</option>
+      </select>` : kind === 'always' ? `<span class="w">任何时候</span>` : ''}
+      <span class="w">→ 使用</span>
+      <select data-rc="profile">${opts.replace(`value="${esc(r.profile || '')}"`, `value="${esc(r.profile || '')}" selected`)}</select>
+      <button class="btn sm ghost rm" data-act="rule-del" data-ri="${i}" title="删除">✕</button>
+    </div>`;
+  }).join('') : `<div class="empty">尚未添加条件</div>`;
+
+  return `<div class="page">
+    ${S.online === false ? offlineCard() : powerCard()}
+    ${rs.always ? `<div class="banner" style="margin-bottom:12px">
+      <b>「一直拦截」已开启</b> · 下方条件不生效
+      <button class="btn sm" data-act="mode-rule" style="margin-left:10px">改为仅满足条件时</button>
+    </div>` : ''}
+    <div class="bar">
+      <span class="muted">命中时切换方案 · 越靠上优先级越高</span>
+      <div class="grow"></div>
+      <button class="btn sm" data-act="rule-add" data-kind="prog">＋ 程序</button>
+      <button class="btn sm" data-act="rule-add" data-kind="fs">＋ 全屏</button>
+      ${has('always_rule') ? `<button class="btn sm" data-act="rule-add" data-kind="always">＋ 常驻</button>` : ''}
+    </div>
+    <div class="card"><div class="cb">${rows}</div></div>
+    <datalist id="procs">${(S.procs || []).map(p => `<option value="${esc(p.exe)}">${esc(p.title || '')}</option>`).join('')}</datalist>
+    ${scenes().length ? `<div class="sec" style="margin-top:20px">
+      <div class="h">方案</div>
+      <div class="card"><div class="cb">${scenes().map(s => `<div class="line" style="display:flex;align-items:center;gap:10px;padding:10px">
+        <span class="l"><span class="n">${esc(s.name)}</span><span class="d">${(s.on || []).length} 项启用${(s.used_by || []).length ? ' · 被 ' + esc(s.used_by.join('、')) + ' 使用' : ''}</span></span>
+        <button class="btn sm ghost" data-act="scene-edit" data-n="${esc(s.name)}">编辑</button>
+      </div>`).join('')}</div></div>
+    </div>` : ''}
+  </div>`;
+}
+
+/* ══ 设置 ═══════════════════════════════════════════════ */
+function settingsView(){
+  const st = S.st || {};
+  const rs = ruleset();
+  const be = st.backend || rs.backend || 'hook';
+  const auto = !!rs.blocking;
+  const always = !!rs.always;
+  const theme = S.theme;
+  return `<div class="page">
+    <div class="sec">
+      <div class="h">常规</div>
+      <div class="card">
+        <div class="line"><div class="l"><div class="n">开机启动</div><div class="d">登录时自动启动 · 管理员权限</div></div>
+          <button class="sw${S.auto ? ' on' : ''}" data-act="autostart" role="switch" aria-checked="${!!S.auto}"></button></div>
+        <div class="line"><div class="l"><div class="n">始终拦截</div><div class="d">忽略条件，持续拦截</div></div>
+          <button class="sw${always ? ' on' : ''}" data-act="always" role="switch" aria-checked="${always}"></button></div>
+        <div class="line"><div class="l"><div class="n">解除快捷键</div><div class="d">按下后解除拦截</div></div>
+          <div class="kbdrow">${kb('Ctrl + Alt + Shift + F12')}</div></div>
+        <div class="line"><div class="l"><div class="n">关闭按钮</div><div class="d">点 ✕ 时的动作</div></div>
+          <div class="seg" data-seg="quit">
+            <button data-sv="ask" class="${S.quitDef === 'ask' ? 'on' : ''}">每次询问</button>
+            <button data-sv="tray" class="${S.quitDef === 'tray' ? 'on' : ''}">收进托盘</button>
+            <button data-sv="exit" class="${S.quitDef === 'exit' ? 'on' : ''}">直接退出</button>
+          </div></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="h">拦截状态</div>
+      <div class="card">
+        <div class="line"><div class="l"><div class="n">后台连接</div></div>
+          <span class="chk" id="sc-conn">—</span></div>
+        <div class="line"><div class="l"><div class="n">权限</div><div class="d">前台程序权限更高时拦截失效</div></div>
+          <span class="chk" id="sc-elev">—</span></div>
+        <div class="line"><div class="l"><div class="n">键盘钩子</div><div class="d">仅在拦截期间装载</div></div>
+          <span class="chk" id="sc-hook">—</span></div>
+        <div class="line"><div class="l"><div class="n">执行方式</div><div class="d">扫描码模式需重启系统</div></div>
+          <span class="chk" id="sc-be">—</span></div>
+        <div class="line"><div class="l"><div class="n">当前拦截</div></div>
+          <span class="chk" id="sc-n">—</span></div>
+        <div class="line"><div class="l"><div class="n">最近一次拦截</div></div>
+          <span class="chk" id="sc-last">—</span></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="h">外观</div>
+      <div class="card"><div class="line"><div class="l"><div class="n">主题</div></div>
+        <div class="seg" data-seg="theme">
+          <button data-sv="auto" class="${theme === 'auto' ? 'on' : ''}">跟随系统</button>
+          <button data-sv="dark" class="${theme === 'dark' ? 'on' : ''}">深色</button>
+          <button data-sv="light" class="${theme === 'light' ? 'on' : ''}">浅色</button>
+        </div></div></div>
+    </div>
+
+    <div class="sec">
+      <div class="h">数据</div>
+      <div class="card">
+        <div class="line"><div class="l"><div class="n">导出 / 导入</div><div class="d">JSON · 可跨机迁移</div></div>
+          <button class="btn sm" data-act="export">导出</button>
+          <button class="btn sm" data-act="import">导入</button></div>
+        <div class="line"><div class="l"><div class="n">恢复默认</div><div class="d">清空全部开关与条件</div></div>
+          <button class="btn sm" data-act="reset">恢复默认</button></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="h">高级</div>
+      <div class="card">
+        <div class="line"><div class="l"><div class="n">执行方式</div><div class="d">${be === 'scancode' ? '扫描码映射 · 需重启' : be === 'off' ? '仅检测不拦' : '键盘钩子 · 即开即用'}</div></div>
+          <div class="seg" data-seg="backend">
+            <button data-sv="hook" class="${be === 'hook' ? ' on' : ''}">键盘钩子</button>
+            <button data-sv="scancode" class="${be === 'scancode' ? ' on' : ''}">扫描码</button>
+            <button data-sv="off" class="${be === 'off' ? ' on' : ''}">仅检测</button>
+          </div></div>
+        <details class="adv"><summary>诊断</summary>
+          <div class="kv">
+            <span class="k">状态</span><span class="v">${esc(st.mode_name || '—')} (${st.mode | 0}) · armed ${st.armed}</span>
+            <span class="k">前台</span><span class="v">${esc((st.fg && st.fg.exe) || '—')} · ${st.fg && st.fg.fullscreen ? '全屏' : '非全屏'}</span>
+            <span class="k">回调</span><span class="v">p50 ${st.p50_us | 0}µs · p99 ${st.p99_us | 0}µs · 样本 ${st.hook_samples | 0}</span>
+            <span class="k">拦截 / 放行</span><span class="v">${st.blocked | 0} / ${st.passed | 0}</span>
+            <span class="k">后台</span><span class="v">pid ${st.agent_pid | 0} · ${st.elevated ? '管理员' : '普通权限'}</span>
+            <span class="k">管道</span><span class="v">${esc(st.pipe_sddl || '')}</span>
+          </div>
+          <div style="padding:0 14px 14px"><button class="btn sm" data-act="copy-diag">复制诊断信息</button></div>
+        </details>
+        <div class="line"><div class="l"><div class="n">配置文件</div><div class="d mono">%APPDATA%\\KeyGuard\\rules.json</div></div></div>
+      </div>
+    </div>
+
+    <div class="hint" style="text-align:center;padding:8px 0 0">KeyGuard v__KG_VER__ · __KG_BUILD__</div>
+  </div>`;
+}
+
+/* ---------- 动作 ---------- */
+document.addEventListener('click', e => {
+  // 点暗色背景 = 取消（只对关闭确认生效；输入框弹层误点会丢内容，不套用）
+  if (e.target.id === 'quit'){ quitClose(); return; }
+  const nav = e.target.closest('.nav');
+  if (nav){ S.page = nav.dataset.page; LS.set('kg.page', S.page); send({op:'ui_set', page: S.page}); render(); return; }
+
+  const winBtn = e.target.closest('[data-win]');
+  if (winBtn){
+    // 关闭键先问一句：拦截是常驻功能，误点一下不该让整个界面凭空消失
+    // 选过「下次不再询问」就直接照做；没选过才弹层问
+    if (winBtn.dataset.win === 'close'){ if (!quitAuto()) openQuit(); return; }
+    win(winBtn.dataset.win); return;
+  }
+
+  const fold = e.target.closest('[data-fold]');
+  if (fold){ const g = fold.dataset.fold; S.fold[g] = !S.fold[g]; render(); return; }
+
+  const sw = e.target.closest('[data-toggle]');
+  if (sw){ toggleKey(sw.dataset.toggle); return; }
+
+  const jump = e.target.closest('[data-jump]');
+  if (jump){
+    const row = document.querySelector(`[data-row="${jump.dataset.jump}"]`);
+    if (row){ row.scrollIntoView({block:'center'}); row.classList.add('hl'); setTimeout(() => row.classList.remove('hl'), 900); }
+    return;
+  }
+
+  const ps = e.target.closest('[data-preset]');
+  if (ps){ applyPreset(ps.dataset.preset); return; }
+
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const a = b.dataset.act;
+
+  if (a === 'start'){ send({op:'start_agent'}); return; }
+  if (a === 'lock'){ send({op:'lock'}); return; }
+  if (a === 'unlock'){ send({op:'panic_release'}); return; }
+  if (a === 'auto'){ send({op:'set_profile', name:''}); return; }
+
+  if (a === 'all'){
+    const ids = (b.dataset.on === '1') ? catList().filter(x => x.how === 'hook' || x.how === 'access').map(x => x.id) : [];
+    applyIds(ids); return;
+  }
+  if (a === 'guide-off'){ LS.set('kg.guide.off','1'); render(); return; }
+  if (a === 'record'){ openRec(); return; }
+  if (a === 'key-del'){ const id = b.dataset.id; if (confirm('删除该快捷键？')) { send({op:'remove_custom_key', id}); setTimeout(() => send({op:'get_catalog'}), 120); } return; }
+  if (a === 'quit-cancel'){ quitClose(); return; }
+  if (a === 'quit-exit'){ quitExit(); return; }
+  if (a === 'quit-tray'){ quitToTray(); return; }
+  if (a === 'ask-ok'){ askClose(true); return; }
+  if (a === 'ask-cancel'){ askClose(false); return; }
+  if (a === 'imp-ok'){ importClose(true); return; }
+  if (a === 'imp-cancel'){ importClose(false); return; }
+  if (a === 'rec-cancel'){ closeRec(); return; }
+  if (a === 'rec-save'){ saveRec(); return; }
+
+  if (a === 'scheme-menu'){ schemeMenu(b); return; }
+  if (a === 'scene-new'){ newScheme(); return; }
+  if (a === 'scene-edit'){ S.edit = b.dataset.n; S.page = 'keys'; render(); return; }
+  if (a === 'scene-del'){ delScheme(); return; }
+
+  if (a === 'rule-add'){
+    const rs = ruleset();
+    const kind = b.dataset.kind;
+    const r = { id:'r' + Date.now().toString(36), name:'', exe:[], class:'', fullscreen: kind === 'fs', always: kind === 'always',
+      foreground:true, action:'lock', delay_ms:0, release_delay_ms:0, ttl_ms:0, profile:'', enabled:true };
+    rs.rules = (rs.rules || []).concat([r]);
+    commit(rs); return;
+  }
+  if (a === 'rule-del'){
+    const rs = ruleset();
+    rs.rules.splice(+b.dataset.ri, 1);
+    commit(rs); return;
+  }
+
+  if (a === 'autostart'){ send({op:'autostart', on: !S.auto}); S.auto = !S.auto; render(); return; }
+  if (a === 'always'){ send({op:'set_always', on: !ruleset().always}); return; }  if (a === 'mode-rule'){
+    const rs = ruleset();
+    rs.always = false;
+    send({op:'set_always', on: false});
+    toast('已切换为「仅满足条件时」· 未命中时放行');
+    render();
+    return;
+  }
+  if (a === 'cur-exe'){
+    const i = +b.dataset.ri, rs = ruleset();
+    const exe = (S.st && S.st.fg && S.st.fg.exe) || '';
+    if (!rs.rules[i] || !exe) return;
+    rs.rules[i].exe = [exe];
+    commit(rs);
+    return;
+  }
+  if (a === 'quick-rule'){
+    const rs = ruleset();
+    const exe = (S.st && S.st.fg && S.st.fg.exe) || '';
+    if (!exe) return;
+    rs.rules.push({ id: 'r' + Date.now().toString(36), name: '', exe: [exe], class: '',
+      fullscreen: false, foreground: true, always: false, action: 'lock',
+      delay_ms: 0, release_delay_ms: 0, ttl_ms: 0, profile: '', enabled: true });
+    commit(rs);
+    toast('已添加条件：当前台程序为 ' + exe + ' · → 默认方案');
+    return;
+  }
+  if (a === 'power'){
+    const rs = ruleset();
+    const next = rs.blocking === false;
+    rs.blocking = next;
+    send({op:'set_blocking', on: next});
+    toast(next ? '拦截已开启' : '拦截已关闭 · 按键全部放行');
+    render();
+    return;
+  }
+  if (a === 'export'){ send({op:'export_rules'}); return; }
+  if (a === 'import'){ importDialog(); return; }
+  if (a === 'reset'){ if (confirm('清空全部开关与自动切换条件？')) resetAll(); return; }
+  if (a === 'copy-diag'){ copyDiag(); return; }
+});
+
+/* 分段控件（主题 / 执行方式） */
+document.addEventListener('click', e => {
+  const seg = e.target.closest('.seg [data-sv]');
+  if (!seg) return;
+  const box = seg.closest('[data-seg]');
+  const kind = box.dataset.seg, val = seg.dataset.sv;
+  if (kind === 'theme'){ S.theme = val; LS.set('kg.theme', val); send({op:'ui_set', theme: val}); document.documentElement.dataset.theme = resolveTheme(); render(); }
+  if (kind === 'quit'){
+    S.quitDef = val; send({op:'ui_set', quitDefault: val});
+    toast(val === 'ask' ? '点 ✕ 时每次确认' : val === 'tray' ? '点 ✕ 直接收进托盘，拦截不受影响' : '点 ✕ 直接关闭界面，后台继续拦截');
+    render();
+  }
+  if (kind === 'backend'){ send({op:'set_backend', backend: val}); }
+  if (kind === 'mode'){
+    const want = val === 'always';
+    const rs = ruleset();
+    rs.always = want;
+    send({op:'set_always', on: want});
+    toast(want ? '已切换为「一直拦截」· 拦截所有程序' : '已切换为「仅满足条件时」· 未命中时放行');
+    render();
+  }
+});
+
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.id === 'scheme'){
+    S.edit = t.value;
+    send({op:'set_profile', name: t.value});     // 选中即套用，页面里看到的就是正在生效的
+    render(); return;
+  }
+  if (t.dataset.seg === 'theme'){ return; }
+  if (t.dataset.seg === 'backend'){
+    send({op:'set_backend', backend: t.value}); return;
+  }
+  // 规则行
+  const row = t.closest('[data-ri]');
+  if (row){
+    const i = +row.dataset.ri, rs = ruleset(), r = rs.rules[i];
+    if (!r) return;
+    const k = t.dataset.rc;
+    if (k === 'kind'){
+      if (t.value === 'always'){ r.always = true; r.fullscreen = false; r.exe = []; r.class = ''; }
+      else if (t.value === 'fs'){ r.always = false; r.fullscreen = true; r.exe = []; r.class = ''; }
+      else { r.always = false; r.fullscreen = false; r.exe = []; r.class = ''; }
+      r.action = 'lock';
+    }
+    if (k === 'exe'){ r.exe = t.value.split(/[,，\s]+/).map(s => s.trim()).filter(Boolean); }
+    if (k === 'when'){ r.fullscreen = t.value === 'fs'; }
+    if (k === 'profile'){ r.profile = t.value; }
+    commit(rs);
+    return;
+  }
+});
+
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.id === 'q'){ S.q = t.value; filterRows(); return; }
+  const row = t.closest('[data-ri]');
+  if (row && t.dataset.rc === 'exe'){
+    const rs = ruleset(), r = rs.rules[+row.dataset.ri];
+    if (r) r.exe = t.value.split(/[,，\s]+/).map(s => s.trim()).filter(Boolean);
+  }
+});
+
+document.addEventListener('focusin', e => {
+  if (e.target.classList && e.target.classList.contains('exe') && !(S.procs || []).length && has('list_procs')) send({op:'list_procs'});
+});
+document.addEventListener('keydown', e => {
+  const askOpen = !document.getElementById('ask').hidden;
+  if (askOpen && e.key === 'Enter'){ e.preventDefault(); askClose(true); return; }
+  if (askOpen && e.key === 'Escape'){ e.preventDefault(); askClose(false); return; }
+  const impOpen = !document.getElementById('imp').hidden;
+  if (impOpen && e.key === 'Escape'){ e.preventDefault(); importClose(false); return; }
+  const quitOpen = !document.getElementById('quit').hidden;
+  if (quitOpen && e.key === 'Escape'){ e.preventDefault(); quitClose(); return; }
+  if (quitOpen && e.key === 'Enter'){ e.preventDefault(); quitToTray(); return; }
+  if (recKey(e)) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k'){ e.preventDefault(); const q = $('#q'); if (q) q.focus(); }
+  if (e.key === 'Escape'){ closeMenu(); }
+});
+
+/* 顶部拖动 */
+$('#top').addEventListener('mousedown', e => {
+  // 按钮区整块不拖（含按钮里的 <svg> 图标）——
+  // 只判 closest('button') 时，图标里层的 svg/path 在某些内核版本判不出来，会把点按钮当成拖窗口。
+  if (e.target.closest('.wbtns')) return;
+  if (e.button !== 0) return;
+  win('drag');
+});
+document.addEventListener('mousedown', e => { if (!e.target.closest('#menu') && !e.target.closest('[data-act="scheme-menu"]')) closeMenu(); });
+
+/* ---------- 操作实现 ---------- */
+function applyIds(ids){
+  const prev = effOn().slice();
+  optimistic(ids);
+  if (S.edit) send({op:'set_scene', name:S.edit, ids});
+  else send({op:'set_hotkeys', ids});
+  toast(`已更新 · ${ids.length} 项启用`, '撤销', () => applyIds(prev));
+  setTimeout(() => send({op:'get_catalog'}), 120);
+}
+function toggleKey(id){
+  const cur = effOn().slice();
+  const i = cur.indexOf(id);
+  if (i >= 0) cur.splice(i,1); else cur.push(id);
+  applyIds(cur);
+}
+function optimistic(ids){
+  if (S.edit){ const sc = sceneOf(S.edit); if (sc) sc.on = ids.slice(); }
+  else S.base = ids.slice();
+  render();
+}
+function commit(rs){
+  send({op:'put_rules', rules:{
+    version: rs.version || 7, rules: rs.rules || [], profiles: rs.profiles || [],
+    hotkeys: baseOn().slice(), backend: rs.backend || 'hook',
+    blocking: !!rs.blocking, always: !!rs.always }});
+  render();
+}
+
+/* 方案 */
+function schemeMenu(anchor){
+  const m = $('#menu');
+  const r = anchor.getBoundingClientRect();
+  m.innerHTML = `<div class="lb">方案</div>
+    ${scenes().map(s => `<button data-m="pick" data-n="${esc(s.name)}">${esc(s.name)}${S.edit === s.name ? ' ✓' : ''}</button>`).join('') || '<div class="lb">只有一个方案</div>'}
+    <div class="sep"></div>
+    <button data-m="new">新建方案…</button>
+    ${S.edit ? `<button data-m="rename">重命名…</button><button data-m="del">删除「${esc(S.edit)}」</button>` : ''}`;
+  m.style.left = Math.round(r.left) + 'px'; m.style.top = Math.round(r.bottom + 6) + 'px';
+  m.classList.add('on');
+  m.querySelectorAll('[data-m]').forEach(btn => btn.onclick = () => {
+    const act = btn.dataset.m; closeMenu();
+    if (act === 'pick'){ S.edit = btn.dataset.n; send({op:'set_profile', name:S.edit}); render(); }
+    if (act === 'new') newScheme();
+    if (act === 'rename') renameScheme();
+    if (act === 'del') delScheme();
+  });
+}
+function closeMenu(){ $('#menu').classList.remove('on'); }
+
+let ASK = null;
+function askText(title, value, hint, cb){
+  ASK = cb;
+  const m = $('#ask');
+  $('#askTitle').textContent = title;
+  $('#askHint').textContent = hint || '';
+  const inp = $('#askInput');
+  inp.value = value || '';
+  m.hidden = false;
+  setTimeout(() => { inp.focus(); inp.select(); }, 30);
+}
+function askClose(ok){
+  const m = $('#ask');
+  const v = $('#askInput').value.trim();
+  m.hidden = true;
+  const cb = ASK; ASK = null;
+  if (ok && cb) cb(v);
+}
+function newScheme(){
+  askText('新建方案', '游戏', '例如「游戏」「录课」', name => {
+    if (!name) return;
+    send({op:'set_scene', name, ids: effOn().slice()});
+    S.edit = name;
+    setTimeout(() => { send({op:'set_profile', name}); send({op:'get_catalog'}); }, 120);
+  });
+}
+function renameScheme(){
+  if (!S.edit) return;
+  askText('重命名方案', S.edit, '引用该方案的条件将同步改名', to => {
+  if (!to || to === S.edit) return;
+  if (has('profile_meta')){ send({op:'rename_profile', from:S.edit, to}); S.edit = to; }
+  else { send({op:'set_scene', name:to, ids: effOn().slice()}); setTimeout(() => { send({op:'delete_scene', name:S.edit}); send({op:'get_catalog'}); }, 150); S.edit = to; }
+  setTimeout(() => send({op:'get_catalog'}), 260);
+  });
+}
+function delScheme(){
+  if (!S.edit || !confirm(`删除方案「${S.edit}」？`)) return;
+  send({op:'delete_scene', name: S.edit});
+  S.edit = '';
+  setTimeout(() => { send({op:'set_profile', name:''}); send({op:'get_catalog'}); }, 140);
+}
+
+function filterRows(){
+  const q = S.q.trim().toLowerCase();
+  document.querySelectorAll('.grp').forEach(g => {
+    let hit = 0;
+    g.querySelectorAll('.row').forEach(r => {
+      const id = r.dataset.row;
+      const e = catList().find(x => x.id === id) || {};
+      const hay = ((e.name || '') + ' ' + (e.combo || '') + ' ' + (e.note || '')).toLowerCase();
+      const ok = !q || hay.includes(q);
+      r.hidden = !ok; if (ok) hit++;
+    });
+    g.hidden = q ? hit === 0 : false;
+    if (q) g.querySelector('.rows').hidden = false;
+  });
+}
+function resetAll(){
+  const rs = ruleset();
+  send({op:'put_rules', rules:{version: rs.version || 7, rules:[], profiles:[], hotkeys:[], backend:'hook', blocking:false, always:false}});
+  S.edit = '';
+  setTimeout(() => { send({op:'set_profile', name:''}); send({op:'get_rules'}); send({op:'get_catalog'}); }, 150);
+}
+function importDialog(){
+  const m = $('#imp'); m.hidden = false;
+  setTimeout(() => $('#impText').focus(), 30);
+}
+function importClose(ok){
+  const m = $('#imp'); m.hidden = true;
+  if (!ok) return;
+  const txt = $('#impText').value.trim();
+  if (!txt) return;
+  send({op:'import_rules', json: txt});
+  setTimeout(() => { send({op:'get_rules'}); send({op:'get_catalog'}); }, 200);
+}
+function exportFile(d){
+  const blob = new Blob([d.json || ''], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'keyguard-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  toast('已导出');
+}
+function copyDiag(){
+  const st = S.st || {};
+  const txt = JSON.stringify({agent:st.agent_pid, mode:st.mode, armed:st.armed, fg:st.fg, p50:st.p50_us, p99:st.p99_us,
+    samples:st.hook_samples, blocked:st.blocked, passed:st.passed, backend:st.backend, blocking:st.blocking,
+    version:S.rules && S.rules.version}, null, 2);
+  navigator.clipboard.writeText(txt).then(() => toast('已复制'), () => toast('复制失败'));
+}
+
+/* ---------- toast ---------- */
+let toastTimer = null;
+function toast(msg, actionLabel, fn){
+  const t = $('#toast');
+  t.innerHTML = `<span>${esc(msg)}</span>` + (actionLabel ? `<button id="tundo">${esc(actionLabel)}</button>` : '');
+  t.classList.add('on');
+  if (actionLabel){
+    $('#tundo').onclick = () => { t.classList.remove('on'); try{ fn && fn(); }catch(e){} };
+  }
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('on'), actionLabel ? 6000 : 2400);
+}
+
+
+/* ---------- 记录组合键 ---------- */
+const REC = { on:false, vks:[], need:0, combo:'', label:'' };
+const VKNAME = {8:'Backspace',9:'Tab',13:'Enter',27:'Esc',32:'Space',33:'PageUp',34:'PageDown',35:'End',36:'Home',
+  37:'←',38:'↑',39:'→',40:'↓',45:'Insert',46:'Delete',44:'PrtSc',91:'Win',92:'Win',16:'Shift',17:'Ctrl',18:'Alt'};
+function vkLabel(code, key){
+  if (VKNAME[code]) return VKNAME[code];
+  if (key && key.length === 1) return key.toUpperCase();
+  if (/^Fd{1,2}$/.test(key || '')) return key;
+  return key || ('VK' + code);
+}
+function openRec(){
+  REC.on = true; REC.vks = []; REC.need = 0; REC.combo = ''; REC.label = '';
+  const m = $('#rec'); m.hidden = false;
+  $('#cap').className = 'capture'; $('#cap').innerHTML = '<span class="muted">按下要拦的组合键</span>';
+  $('[data-act="rec-save"]').disabled = true;
+}
+function closeRec(){ REC.on = false; $('#rec').hidden = true; }
+
+/* ---------- 关闭确认 ----------
+   点右上角 ✕ 不再直接退：拦截是常驻的，误点一下窗口就没了，
+   用户会以为拦截也跟着停了。先问一句「退出界面 / 收进托盘」。
+   托盘图标是 Agent 建的：Agent 不在线时窗口藏起来就没人叫得回来，
+   这种时候把「收进托盘」按下去是坑人，直接禁用并说明原因。 */
+function openQuit(){
+  // 只有确认在线（true）才允许收进托盘：首帧状态还没回来时也算不可靠
+  const noTray = S.online !== true;
+  $('#quitTray').disabled = noTray;
+  $('#quitWarn').hidden = !noTray;
+  $('#quitRemember').checked = false;   // 每次重新问都是独立的一次选择，别继承上次的勾
+  $('#quit').hidden = false;
+  if (!noTray) setTimeout(() => $('#quitTray').focus(), 30);
+}
+function quitClose(){ $('#quit').hidden = true; }
+
+/* 「下次不再询问」：勾了才记，记的是动作本身（tray / exit），下次点 ✕ 直接照做。
+   落在 %APPDATA%\KeyGuard\ui.json 的 quitDefault，设置页里能改回「每次询问」。 */
+function rememberQuit(v){
+  if (!$('#quitRemember').checked || S.quitDef === v) return;
+  S.quitDef = v;
+  send({op:'ui_set', quitDefault: v});
+}
+/* 已经按偏好处理掉了就返回 true，不用再弹层。
+   quitDefault=托盘但 Agent 不在线时不能硬来 —— 藏起来就没人能叫回来，退回询问。 */
+function quitAuto(){
+  if (S.quitDef === 'exit'){ win('close'); return true; }
+  if (S.quitDef === 'tray' && S.online === true){ win('hide'); return true; }
+  return false;
+}
+// 键盘 Enter 也会走到这里：托盘按钮被禁用时（Agent 不在线）绝不能真把窗口藏起来，
+// 否则界面上写着「禁用」，键盘一按照样失联。
+function quitToTray(){ if ($('#quitTray').disabled) return; rememberQuit('tray'); $('#quit').hidden = true; win('hide'); }
+function quitExit(){ rememberQuit('exit'); $('#quit').hidden = true; win('close'); }
+function recKey(e){
+  if (!REC.on) return false;
+  if (e.key === 'Escape'){ closeRec(); return true; }
+  e.preventDefault(); e.stopPropagation();
+  const code = e.keyCode || 0;
+  if ([16,17,18,91,92].includes(code)) return true;   // 只按修饰键，等主键
+  const parts = [], vks = [], need0 = {16:4,17:2,18:1};
+  if (e.ctrlKey){ parts.push('Ctrl'); vks.push(17); }
+  if (e.altKey){ parts.push('Alt'); vks.push(18); }
+  if (e.shiftKey){ parts.push('Shift'); vks.push(16); }
+  if (e.metaKey){ parts.push('Win'); vks.push(91); }
+  if (!code) return true;
+  const main = vkLabel(code, e.key);
+  parts.push(main);
+  vks.push(code);
+  REC.vks = vks; REC.combo = parts.join(' + '); REC.label = main;
+  REC.need = (e.altKey ? 1 : 0) | (e.ctrlKey ? 2 : 0) | (e.shiftKey ? 4 : 0);
+  if (vks.length > 3){
+    $('#cap').className = 'capture'; $('#cap').textContent = REC.combo;
+    $('#caphint').textContent = '最多三个键位';
+    $('[data-act="rec-save"]').disabled = true;
+    return true;
+  }
+  $('#cap').className = 'capture live'; $('#cap').textContent = REC.combo;
+  const weak = !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !/^Fd{1,2}$/.test(main);
+  $('#caphint').textContent = weak ? '未包含修饰键 · 该键全部输入将被拦截' : '';
+  $('[data-act="rec-save"]').disabled = false;
+  return true;
+}
+function saveRec(){
+  if (!REC.vks.length) return;
+  send({ op:'add_custom_key', name: REC.combo, combo: REC.combo, vks: REC.vks, need: REC.need });
+  closeRec();
+  toast('已录制 ' + REC.combo, '撤销', () => {});
+  setTimeout(() => send({op:'get_catalog'}), 150);
+}
+
+/* ---------- 启动 ---------- */
+window.onerror = function(msg, src, line, col, err){
+  // 界面脚本出错时不要让用户面对一片空白：给一句人话 + 可复制的细节。
+  const v = document.getElementById('view');
+  if (!v) return;
+  const detail = (err && err.stack ? String(err.stack) : String(msg) + ' @' + line + ':' + col);
+  v.innerHTML = '<div class="page"><div class="errbox">'
+    + '<div class="et">界面渲染异常</div>'
+    + '<div class="ed">后台进程仍在运行 · 重新打开界面即可</div>'
+    + '<textarea class="ta" readonly></textarea>'
+    + '<div class="hrow"><button class="btn sm pri" onclick="location.reload()">重新加载</button>'
+    + '<button class="btn ghost sm" onclick="navigator.clipboard.writeText(this.closest(\'.errbox\').querySelector(\'textarea\').value)">复制错误信息</button></div>'
+    + '</div></div>';
+  const ta = v.querySelector('textarea');
+  if (ta) ta.value = detail;
+};
+(function boot(){
+  document.documentElement.dataset.theme = resolveTheme();
+  if (START_PAGE) S.page = START_PAGE;
+  render();
+  send({op:'status'});
+  send({op:'autostart'});
+  send({op:'ui_get'});
+})();
+</script>
+</body>
+</html>
