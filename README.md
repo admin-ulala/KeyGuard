@@ -56,7 +56,7 @@ KeyGuard：**在指定条件下拦截指定组合键；条件结束即恢复原�
 
 ## 安装
 
-从 [Releases](../../releases) 下载 `KeyGuard-0.1.12-setup.exe` 并安装。
+从 [Releases](https://github.com/admin-ulala/KeyGuard/releases) 下载 `KeyGuard-0.1.12-setup.exe` 并安装。
 
 | 安装包 | 安装位置 | 权限 |
 | --- | --- | --- |
@@ -69,7 +69,7 @@ KeyGuard：**在指定条件下拦截指定组合键；条件结束即恢复原�
 KeyGuard-0.1.12-setup.exe /S /D=D:\Tools\KeyGuard
 ```
 
-`/D` 必须置于参数末尾，路径不加引号。卸载时保留 `%APPDATA%\KeyGuard\` 下的配置，重装后继续生效。各版本变更见 [docs/发布-0.1.12.md](docs/发布-0.1.12.md)。
+`/D` 必须置于参数末尾，路径不加引号。卸载时保留 `%APPDATA%\KeyGuard\` 下的配置，重装后继续生效。各版本变更见 [Releases](https://github.com/admin-ulala/KeyGuard/releases)。
 
 > 首次运行时 Windows 会提示 SmartScreen「未知发布者」：安装包未做代码签名，需在提示中选择「仍要运行」。也可从源码自行构建，见[从源码构建](#从源码构建)。
 
@@ -226,7 +226,7 @@ crates/
 assets/           图标（ico / svg / rgba）
 installer/        NSIS 脚本
 dist/             安装包产物
-docs/             设计方案、发布说明、截图、图标源文件
+docs/             截图、图标源文件
 tools/            开发期脚本（截图、验收、打包）
 ```
 

@@ -56,7 +56,7 @@ Three concepts make up the whole feature set:
 
 ## Installation
 
-Download `KeyGuard-0.1.12-setup.exe` from [Releases](../../releases) and run the installer.
+Download `KeyGuard-0.1.12-setup.exe` from [Releases](https://github.com/admin-ulala/KeyGuard/releases) and run the installer.
 
 | Package | Install location | Privilege |
 | --- | --- | --- |
@@ -69,7 +69,7 @@ Silent install:
 KeyGuard-0.1.12-setup.exe /S /D=D:\Tools\KeyGuard
 ```
 
-`/D` must be the last parameter, and the path must not be quoted. Uninstalling preserves the configuration under `%APPDATA%\KeyGuard\`, which stays in effect after reinstalling. Per-version changes: [docs/发布-0.1.12.md](docs/发布-0.1.12.md).
+`/D` must be the last parameter, and the path must not be quoted. Uninstalling preserves the configuration under `%APPDATA%\KeyGuard\`, which stays in effect after reinstalling. Per-version changes: [Releases](https://github.com/admin-ulala/KeyGuard/releases).
 
 > On first launch Windows shows a SmartScreen "Unknown publisher" prompt: the installer is not code-signed, so select "Run anyway" in that dialog. Alternatively, build from source — see [Building from source](#building-from-source).
 
@@ -226,7 +226,7 @@ crates/
 assets/           icons (ico / svg / rgba)
 installer/        NSIS script
 dist/             installer artifacts
-docs/             design notes, release notes, screenshots, icon sources
+docs/             screenshots, icon sources
 tools/            development scripts (screenshots, acceptance, packaging)
 ```
 
